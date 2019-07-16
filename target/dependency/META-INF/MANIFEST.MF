@@ -1,0 +1,14 @@
+Manifest-Version: 1.0
+Implementation-Title: twamp-client
+Implementation-Version: 0.0.1-SNAPSHOT
+Built-By: mckang
+Implementation-Vendor-Id: com.bdwise.twamp
+Spring-Boot-Version: 2.1.6.RELEASE
+Main-Class: org.springframework.boot.loader.JarLauncher
+Start-Class: com.bdwise.twamp.client.Main
+Spring-Boot-Classes: BOOT-INF/classes/
+Spring-Boot-Lib: BOOT-INF/lib/
+Created-By: Apache Maven 3.5.3
+Build-Jdk: 1.8.0_212
+Implementation-URL: http://maven.apache.org
+
