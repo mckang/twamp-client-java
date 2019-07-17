@@ -30,7 +30,7 @@ public class Application implements  ApplicationContextAware {
 	private ApplicationContext applicationContext;
 	public static void main(String[] args) throws Exception{
 		SpringApplication application = new SpringApplication(Application.class);
-		application.addListeners(new ApplicationPidFileWriter("./bin/app.pid"));
+		application.addListeners(new ApplicationPidFileWriter("./application.pid"));
 		application.run(args);
 //		Thread.sleep(10000);
 //		SpringApplication.exit(context, () -> 0);

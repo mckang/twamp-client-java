@@ -44,14 +44,14 @@ public class GraphiteWriter implements InitializingBean {
 	@EventListener
 	public void handleEvent(ReceivePacketEvent receivePacketEvent) {
 		stats.addValue(receivePacketEvent.getDelay());
-		System.out.println(stats.toString());
+//		System.out.println(stats.toString());
 
 	}
 
 	@EventListener
 	@Async
 	public void handleControlSessionStopEvent(ControlSessionClosedEvent controlSessionClosedEvent) throws IOException {
-		System.out.println(stats.toString());
+		ticker.cancel();
 		applicationEventPublisher.publishEvent(new StopClientEvent(this));
 	}
 
