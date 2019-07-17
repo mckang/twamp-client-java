@@ -16,6 +16,10 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 
 public class HandshakeManager implements SmartLifecycle{
 	private Logger logger = LoggerFactory.getLogger(getClass());
@@ -50,7 +54,7 @@ public class HandshakeManager implements SmartLifecycle{
 	    clientBootstrap.remoteAddress(new InetSocketAddress(server, port));
 	    clientBootstrap.handler(new ChannelInitializer<SocketChannel>() {
 	        protected void initChannel(SocketChannel socketChannel) throws Exception {
-	            socketChannel.pipeline().addLast(handshakeHandler);
+	            socketChannel.pipeline().addLast(new LoggingHandler(LogLevel.DEBUG)).addLast(handshakeHandler);
 	        }
 	    });
 	    ChannelFuture channelFuture;
@@ -68,8 +72,20 @@ public class HandshakeManager implements SmartLifecycle{
 	public void stop() {
 		if(clientChannel != null && running){
 			logger.info("Shutting down client: {} on port {}",server,port);
-			clientChannel.close();
-			group.shutdownGracefully(1,1,TimeUnit.SECONDS);
+			clientChannel.close().addListener(new GenericFutureListener<Future<? super Void>>() {
+
+				@Override
+				public void operationComplete(Future<? super Void> future) throws Exception {
+					logger.info("tcp clientChannel closed!!!");
+				}
+			});
+			group.shutdownGracefully(1,1,TimeUnit.SECONDS).addListener(new GenericFutureListener<Future<? super Object>>() {
+
+				@Override
+				public void operationComplete(Future<? super Object> future) throws Exception {
+					logger.info("tcp group closed!!!");
+				}
+			});
 			running = false;
 		}	
 	}

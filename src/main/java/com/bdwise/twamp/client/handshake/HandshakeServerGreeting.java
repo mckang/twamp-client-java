@@ -34,7 +34,7 @@ public class HandshakeServerGreeting implements InboundProcessor<HandshakeServer
 	}
 
 	public static class ServerGreeting implements InboundMessage{
-		private byte[] unused = new byte[12];
+		private short[] unused = new short[12];
 		private long modes;
 		private byte[] challenge = new byte[16];
 		private byte[] salt = new byte[16];
@@ -44,7 +44,7 @@ public class HandshakeServerGreeting implements InboundProcessor<HandshakeServer
 		
 		
 		
-		public byte[] getUnused() {
+		public short[] getUnused() {
 			return unused;
 		}
 		public long getModes() {
@@ -72,12 +72,19 @@ public class HandshakeServerGreeting implements InboundProcessor<HandshakeServer
 		}
 		
 		public void readFrom(ByteBuf bytebuf) {
-			bytebuf.readBytes(unused);
+//			bytebuf.readBytes(unused);
+			readUnsignedBytes(bytebuf, unused);
 			modes = bytebuf.readUnsignedInt();
 			bytebuf.readBytes(challenge);
 			bytebuf.readBytes(salt);
 			count = bytebuf.readUnsignedInt();
 			bytebuf.readBytes(mbz);
+		}
+		
+		private void readUnsignedBytes(ByteBuf bytebuf, short[] targets) {
+			for(int i = 0 ; i< targets.length; i++) {
+				targets[i] = bytebuf.readUnsignedByte();
+			}
 		}
 		
 	}

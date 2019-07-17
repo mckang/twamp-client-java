@@ -3,25 +3,24 @@ package com.bdwise.twamp.client;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.util.concurrent.CountDownLatch;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.SmartLifecycle;
 import org.springframework.context.event.EventListener;
 
 import com.bdwise.twamp.client.event.ControlSessionClosedEvent;
 import com.bdwise.twamp.client.event.ReceivePacketStopEvent;
 import com.bdwise.twamp.client.event.ServerInfoReceivedEvent;
-import com.bdwise.twamp.client.event.TestPacketStopEvent;
 import com.bdwise.twamp.client.handshake.ControlStatus;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
-public class HandshakeHandler extends SimpleChannelInboundHandler<ByteBuf> implements HandshakeProcessor {
+public class HandshakeHandler extends SimpleChannelInboundHandler<ByteBuf> implements HandshakeProcessor, SmartLifecycle {
 	private Logger logger = LoggerFactory.getLogger(getClass());
 
     @Autowired
@@ -30,9 +29,7 @@ public class HandshakeHandler extends SimpleChannelInboundHandler<ByteBuf> imple
 	private ControlStatus status = ControlStatus.HandshakeConnecting;
 
 	private int paddingLength = 0;
-	
-	private CountDownLatch latch = new CountDownLatch(2);
-	
+		
 	public HandshakeHandler(int paddingLength) {
 		this.paddingLength = paddingLength;
 	}
@@ -47,18 +44,17 @@ public class HandshakeHandler extends SimpleChannelInboundHandler<ByteBuf> imple
 		status.process(ctx, null, this);
 	}
 
+	ChannelHandlerContext currentContext = null;
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, ByteBuf in) throws Exception {		
 		status.process(ctx, in, this);
 		
 		switch(status) {
-		case HandshakeDone:
+		case StartTest:
 			long serverUdpPort = ctx.channel().attr(HandshakeProcessor.SERVER_UDP_PORT).get();
 			InetAddress address = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress();
 			applicationEventPublisher.publishEvent(new ServerInfoReceivedEvent(this, address, (int)serverUdpPort));
-			latch.await();
-			ControlStatus.StopSession.process(ctx, null, this);
-			applicationEventPublisher.publishEvent(new ControlSessionClosedEvent(this));
+			currentContext = ctx;
 			break;
 		default:
 			break;
@@ -70,16 +66,34 @@ public class HandshakeHandler extends SimpleChannelInboundHandler<ByteBuf> imple
 		super.channelInactive(ctx);
 	}
 	
-	@EventListener
-	public void  handleTestStopEvent(TestPacketStopEvent testPacketStopEvent) throws IOException {
-		logger.info("handleTestStopEvent : preparing stopping udp daemon........");
-		latch.countDown();
-	}
+
 	
 	@EventListener
 	public void handleReceiveStopEvent(ReceivePacketStopEvent receivePacketStopEvent) throws IOException {
 		logger.info("handleReceiveStopEvent : preparing stopping udp daemon........");
-		latch.countDown();
+		
+		ControlStatus.StopSession.process(currentContext, null, this);
+		running = false;
+		applicationEventPublisher.publishEvent(new ControlSessionClosedEvent(this));
+	}
+
+	protected volatile boolean running = false;
+	
+	@Override
+	public void start() {
+		running = true;
+	}
+
+	@Override
+	public void stop() {
+		if(currentContext != null && !currentContext.isRemoved())
+			ControlStatus.StopSession.process(currentContext, null, this);
+		running = false;
+	}
+
+	@Override
+	public boolean isRunning() {
+		return running;
 	}
 
 }

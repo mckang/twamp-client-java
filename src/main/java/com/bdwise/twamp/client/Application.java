@@ -2,8 +2,8 @@ package com.bdwise.twamp.client;
 
 import java.io.IOException;
 import java.net.SocketException;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,14 +12,14 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.ApplicationPidFileWriter;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.EnableAsync;
 
-import com.bdwise.twamp.client.event.ControlSessionClosedEvent;
-import com.bdwise.twamp.client.event.DatagramSessionClosedEvent;
+import com.bdwise.twamp.client.event.StopClientEvent;
 
 @EnableAsync(proxyTargetClass = true)
 @SpringBootApplication
@@ -28,8 +28,12 @@ public class Application implements  ApplicationContextAware {
 	
 	
 	private ApplicationContext applicationContext;
-	public static void main(String[] args) {
-		SpringApplication.run(Application.class, args);
+	public static void main(String[] args) throws Exception{
+		SpringApplication application = new SpringApplication(Application.class);
+		application.addListeners(new ApplicationPidFileWriter("./bin/app.pid"));
+		application.run(args);
+//		Thread.sleep(10000);
+//		SpringApplication.exit(context, () -> 0);
 	}	
 	
 	@Override
@@ -51,23 +55,23 @@ public class Application implements  ApplicationContextAware {
 	@Qualifier("packetMap")
 	public Map<Long, Packet> packetMap(){
 		
-		return new HashMap<Long, Packet>();
+		return new ConcurrentHashMap<Long, Packet>();
 	}
 	
 	
 	@Bean
-	public TestManager testManager(DatagramSocketManager datagramSocketManager, @Qualifier("paddingLength")  int paddingLength, @Qualifier("packetMap") Map<Long, Packet> packets) {
-		return new TestManager(datagramSocketManager.getDatagramSocket(), paddingLength, packets);
+	public ReflectHandler reflectHandler(@Qualifier("packetMap") Map<Long, Packet> packets, @Value("${twamp.test.count}") int packetCount ){
+		return new ReflectHandler(packets, packetCount);
 	}
 	
 	@Bean
-	public ReflectManager reflectManager(DatagramSocketManager datagramSocketManager, @Qualifier("packetMap") Map<Long, Packet> packets) {
-		return new ReflectManager(datagramSocketManager.getDatagramSocket(), packets);
+	public UdpChannelManager udpChannelManager(@Qualifier("paddingLength")  int paddingLength, @Qualifier("packetMap") Map<Long, Packet> packets, @Value("${twamp.test.count}") int packetCount, ReflectHandler reflectHandler ) throws SocketException {
+		return new UdpChannelManager( paddingLength, packets, packetCount, reflectHandler);
 	}
 	
 	@Bean
-	public DatagramSocketManager datagramSocketManager() throws SocketException {
-		return new DatagramSocketManager();
+	public TickManager tickManager(@Value("${twamp.test.count}") int packetCount) {
+		return new TickManager(packetCount);
 	}
 	
 	@Bean
@@ -81,32 +85,13 @@ public class Application implements  ApplicationContextAware {
 		}
 		return paddingLength;
 	}
-
-	
-	private boolean isControlSessionStopped = false;
-	private boolean isDatagramSessionStopped = false;
 	
 	@EventListener
-	public void  handleControlSessionStopEvent(ControlSessionClosedEvent controlSessionClosedEvent) throws IOException {
-		logger.info("handleControlSessionStopEvent : preparing stopping spring context........");
-		isControlSessionStopped = true;
-		doStop();
+	public void  handleStopClientEvent(StopClientEvent stopClientEvent) throws IOException {
+		logger.info("stopping spring context........");
+		SpringApplication.exit(applicationContext);
 	}
 	
-	@EventListener
-	public void handleDatagramSessionStopEvent(DatagramSessionClosedEvent datagramSessionClosedEvent) throws IOException {
-		logger.info("handleDatagramSessionStopEvent : preparing stopping  spring context........");
-		isDatagramSessionStopped = true;
-		doStop();
-	}
-	
-	private synchronized void doStop() {
-		if(isControlSessionStopped && isDatagramSessionStopped) {
-			logger.info("stopping spring context........");
-			SpringApplication.exit(applicationContext);
-
-		}
-	}
 
 
 }

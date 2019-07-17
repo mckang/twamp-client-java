@@ -57,7 +57,16 @@ public enum ControlStatus {
 		public void process(ChannelHandlerContext ctx, ByteBuf in, HandshakeProcessor HandshakeProcessor) {
 			HandshakeStartSession handshakeStartSession = new HandshakeStartSession();
 			handshakeStartSession.read(ctx, in);
+			HandshakeProcessor.prepareNext(StartTest, ctx);
 		}
+	},
+	StartTest{
+
+		@Override
+		public void process(ChannelHandlerContext ctx, ByteBuf in, HandshakeProcessor HandshakeProcessor) {
+			
+		}
+		
 	}, StopSession {
 
 		@Override
